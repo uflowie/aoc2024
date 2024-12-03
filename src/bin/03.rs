@@ -1,6 +1,10 @@
 use regex::Regex;
+use std::sync::LazyLock;
 
 advent_of_code::solution!(3);
+
+static MUL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"mul\((\d{1,3}),(\d{1,3})\)").unwrap());
 
 pub fn part_one(input: &str) -> Option<i32> {
     Some(solve(input))
@@ -8,18 +12,17 @@ pub fn part_one(input: &str) -> Option<i32> {
 
 pub fn part_two(input: &str) -> Option<i32> {
     let enabled_re = Regex::new(r"(?:^|do\(\)).*?(?:$|don't\(\))").unwrap();
-    let enabled_parts = enabled_re
-        .find_iter(&input.replace("\n", ""))
-        .map(|m| m.as_str())
-        .collect::<String>();
-
-    Some(solve(&enabled_parts))
+    Some(
+        enabled_re
+            .find_iter(&input.replace("\n", ""))
+            .map(|m| solve(m.as_str()))
+            .sum(),
+    )
 }
 
 fn solve(input: &str) -> i32 {
-    let re = Regex::new(r"mul\((\d{1,3}),(\d{1,3})\)").unwrap();
-
-    re.captures_iter(&input.replace("\n", ""))
+    MUL_RE
+        .captures_iter(&input.replace("\n", ""))
         .map(|c| c.extract())
         .map(|(_, [left, right])| left.parse::<i32>().unwrap() * right.parse::<i32>().unwrap())
         .sum()
