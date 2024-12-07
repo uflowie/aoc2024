@@ -1,73 +1,64 @@
-use std::collections::HashSet;
-
 use advent_of_code::indexed_chars;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use std::collections::HashSet;
 
 advent_of_code::solution!(6);
 
 pub fn part_one(input: &str) -> Option<usize> {
-    Some(try_solve(input, None).unwrap().len())
+    let visited = try_solve(input, None)?;
+    Some(visited.len())
 }
 
 pub fn part_two(input: &str) -> Option<usize> {
-    let visited = try_solve(input, None).unwrap();
+    let visited = try_solve(input, None)?;
+
+    let blocked_paths: Vec<_> = visited
+        .par_iter()
+        .filter_map(|&(x, y)| try_solve(input, Some((x, y))))
+        .collect();
 
     Some(
-        visited.len()
-            - visited
-                .par_iter()
-                .filter_map(|(x, y)| try_solve(input, Some((*x, *y))))
-                .collect::<Vec<_>>()
-                .len(),
+        visited.len() - blocked_paths.len() - 1, /* -1 to skip starting position */
     )
 }
 
 fn try_solve(input: &str, extra_obstacle: Option<(i32, i32)>) -> Option<HashSet<(i32, i32)>> {
     let mut tiles = indexed_chars(input);
-
     if let Some(pos) = extra_obstacle {
         tiles.insert(pos, '#');
     }
 
-    let mut visited = HashSet::<((i32, i32), (i32, i32))>::new();
-    let mut dir: (i32, i32) = (-1, 0);
+    let mut direction = (-1, 0);
+    let mut visited = HashSet::new();
 
-    let curr = tiles.iter().find(|(_, &v)| v == '^');
-
-    if curr == None {
-        // hack: ignore the case where the obstacle is put on the starting position
-        return Some(HashSet::default());
-    }
-
-    let mut curr = curr.unwrap().0.to_owned();
+    let start = tiles.iter().find(|&(_, &v)| v == '^')?.0;
+    let mut current = *start;
 
     loop {
-        let visit = (curr, dir);
-
-        if let Some(_) = visited.get(&visit) {
+        let state = (current, direction);
+        if visited.contains(&state) {
             return None;
         }
+        visited.insert(state);
 
-        visited.insert(visit);
-        let next_pos = (curr.0 + dir.0, curr.1 + dir.1);
-
-        if let Some(ch) = tiles.get(&next_pos) {
-            match ch {
-                '.' | '^' => curr = next_pos,
-                '#' => {
-                    dir = match dir {
-                        (0, 1) => (1, 0),
-                        (1, 0) => (0, -1),
-                        (0, -1) => (-1, 0),
-                        (-1, 0) => (0, 1),
-                        _ => dir,
-                    }
-                }
-                _ => {}
+        let next = (current.0 + direction.0, current.1 + direction.1);
+        match tiles.get(&next) {
+            Some('.') | Some('^') => {
+                current = next;
             }
-        } else {
-            return Some(visited.iter().map(|((x, y), _)| (*x, *y)).collect());
-        };
+            Some('#') => {
+                direction = match direction {
+                    (0, 1) => (1, 0),
+                    (1, 0) => (0, -1),
+                    (0, -1) => (-1, 0),
+                    (-1, 0) => (0, 1),
+                    _ => direction,
+                };
+            }
+            _ => {
+                return Some(visited.into_iter().map(|((x, y), _)| (x, y)).collect());
+            }
+        }
     }
 }
 
@@ -77,13 +68,13 @@ mod tests {
 
     #[test]
     fn test_part_one() {
-        let result = part_one(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, Some(41));
+        let input = advent_of_code::template::read_file("examples", DAY);
+        assert_eq!(part_one(&input), Some(41));
     }
 
     #[test]
     fn test_part_two() {
-        let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, Some(6));
+        let input = advent_of_code::template::read_file("examples", DAY);
+        assert_eq!(part_two(&input), Some(6));
     }
 }
