@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 pub mod template;
 
 pub fn rows<T>(v: &Vec<Vec<T>>) -> impl Iterator<Item = impl Iterator<Item = &T>> {
@@ -47,4 +49,16 @@ pub fn minor_diagonals<T>(v: &Vec<Vec<T>>) -> impl Iterator<Item = impl Iterator
             })
         })
         .map(|x| x)
+}
+
+pub fn indexed_chars(input: &str) -> HashMap<(i32, i32), char> {
+    input
+        .lines()
+        .enumerate()
+        .flat_map(|(i, line)| {
+            line.chars()
+                .enumerate()
+                .map(move |(j, ch)| ((i as i32, j as i32), ch))
+        })
+        .collect()
 }
