@@ -1,6 +1,8 @@
 use regex::Regex;
-use std::ops::{Add, Mul};
-use std::sync::LazyLock;
+use std::{
+    ops::{Add, Mul},
+    sync::LazyLock,
+};
 
 advent_of_code::solution!(7);
 
@@ -11,47 +13,61 @@ pub fn part_one(input: &str) -> Option<i128> {
 }
 
 pub fn part_two(input: &str) -> Option<i128> {
+    let concat = |l, r| format!("{}{}", l, r).parse().unwrap();
     Some(solve(input, &[Add::add, Mul::mul, concat]))
 }
 
 fn solve(input: &str, operations: &[fn(i128, i128) -> i128]) -> i128 {
     input
         .lines()
-        .map(|line| {
-            let mut nums = EQUATION_RE
-                .find_iter(line)
-                .map(|m| m.as_str().parse().unwrap());
-
-            let target = nums.next().unwrap();
-            let nums: Vec<_> = nums.collect();
-
-            if is_solvable(nums[0], target, &nums[1..], operations) {
-                target
-            } else {
-                0
-            }
-        })
+        .map(Equation::from)
+        .filter(|e| e.is_solvable(operations))
+        .map(|e| e.target)
         .sum()
 }
 
-fn is_solvable(
-    curr: i128,
+struct Equation {
     target: i128,
-    remaining: &[i128],
-    ops: &[fn(i128, i128) -> i128],
-) -> bool {
-    if remaining.is_empty() {
-        curr == target
-    } else {
-        curr <= target
-            && ops
-                .iter()
-                .any(|op| is_solvable(op(curr, remaining[0]), target, &remaining[1..], ops))
+    nums: Box<[i128]>,
+}
+
+impl Equation {
+    fn is_solvable(&self, operations: &[fn(i128, i128) -> i128]) -> bool {
+        Self::try_solve(self.nums[0], self.target, &self.nums[1..], operations)
+    }
+
+    fn try_solve(
+        current: i128,
+        target: i128,
+        remaining: &[i128],
+        operations: &[fn(i128, i128) -> i128],
+    ) -> bool {
+        if remaining.is_empty() {
+            current == target
+        } else {
+            current <= target
+                && operations.iter().any(|op| {
+                    Self::try_solve(
+                        op(current, remaining[0]),
+                        target,
+                        &remaining[1..],
+                        operations,
+                    )
+                })
+        }
     }
 }
 
-fn concat(left: i128, right: i128) -> i128 {
-    format!("{}{}", left, right).parse().unwrap()
+impl From<&str> for Equation {
+    fn from(value: &str) -> Self {
+        let mut nums = EQUATION_RE
+            .find_iter(value)
+            .map(|m| m.as_str().parse().unwrap());
+        Self {
+            target: nums.next().unwrap(),
+            nums: nums.collect(),
+        }
+    }
 }
 
 #[cfg(test)]
