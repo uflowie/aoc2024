@@ -10,8 +10,13 @@ pub fn part_two(input: &str) -> Option<i64> {
     Some(solve(input, 75))
 }
 
+enum BlinkResult {
+    Single(i64),
+    Double(i64, i64),
+}
+
 fn solve(input: &str, blinks: usize) -> i64 {
-    let mut rock_amounts = input
+    let mut stone_amounts = input
         .replace("\n", "")
         .split_whitespace()
         .map(|i| (i.parse().unwrap(), 1))
@@ -21,41 +26,43 @@ fn solve(input: &str, blinks: usize) -> i64 {
     let mut updates = Vec::new();
 
     for _ in 0..blinks {
-        updates.clear();
-
-        for (&rock, &amount) in rock_amounts.iter().filter(|&(_, &amount)| amount > 0) {
-            let results = if let Some(cached) = blink_results.get(&rock) {
+        for (&stone, &amount) in stone_amounts.iter().filter(|&(_, &amount)| amount > 0) {
+            let result = if let Some(cached) = blink_results.get(&stone) {
                 cached
             } else {
-                let new_results = if rock == 0 {
-                    vec![1]
+                let new_results = if stone == 0 {
+                    BlinkResult::Single(1)
                 } else {
-                    let rock_str = rock.to_string();
-                    if rock_str.len() % 2 == 0 {
-                        let mid = rock_str.len() / 2;
-                        let first = rock_str[..mid].parse().unwrap();
-                        let second = rock_str[mid..].parse().unwrap();
-                        vec![first, second]
+                    if (stone.ilog10() + 1) % 2 == 0 {
+                        let num_of_digits = stone.ilog10() + 1;
+                        let num2 = stone % 10_i64.pow(num_of_digits / 2);
+                        let num1 = (stone - num2) / (10_i64.pow(num_of_digits / 2));
+                        BlinkResult::Double(num1, num2)
                     } else {
-                        vec![rock * 2024]
+                        BlinkResult::Single(stone * 2024)
                     }
                 };
-                blink_results.insert(rock, new_results);
-                blink_results.get(&rock).unwrap()
+                blink_results.insert(stone, new_results);
+                blink_results.get(&stone).unwrap()
             };
 
-            for &result in results {
-                updates.push((result, amount));
+            match result {
+                &BlinkResult::Single(x) => updates.push((x, amount)),
+                &BlinkResult::Double(x, y) => {
+                    updates.push((x, amount));
+                    updates.push((y, amount));
+                }
             }
-            updates.push((rock, -amount));
+
+            updates.push((stone, -amount));
         }
 
-        for &(rock, amount) in &updates {
-            *rock_amounts.entry(rock).or_insert(0) += amount;
+        for (stone, amount) in updates.drain(..) {
+            *stone_amounts.entry(stone).or_insert(0) += amount;
         }
     }
 
-    rock_amounts.values().sum()
+    stone_amounts.values().sum()
 }
 
 #[cfg(test)]
