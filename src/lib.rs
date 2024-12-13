@@ -2,6 +2,21 @@ use std::collections::HashMap;
 
 pub mod template;
 
+pub const DIRECTIONS: [(i32, i32); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
+
+pub fn get_index_neighbors(idx: (i32, i32)) -> [(i32, i32); 4] {
+    [
+        add(idx, DIRECTIONS[0]),
+        add(idx, DIRECTIONS[1]),
+        add(idx, DIRECTIONS[2]),
+        add(idx, DIRECTIONS[3]),
+    ]
+}
+
+pub fn add(left: (i32, i32), right: (i32, i32)) -> (i32, i32) {
+    (left.0 + right.0, left.1 + right.1)
+}
+
 pub fn rows<T>(v: &Vec<Vec<T>>) -> impl Iterator<Item = impl Iterator<Item = &T>> {
     v.iter().map(|row| row.iter())
 }

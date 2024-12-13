@@ -1,10 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use advent_of_code::indexed_chars_iter;
+use advent_of_code::{indexed_chars_iter, DIRECTIONS};
 
 advent_of_code::solution!(10);
 
-const DIRECTIONS: [(i32, i32); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
 
 pub fn part_one(input: &str) -> Option<usize> {
     Some(solve(input, |vec| vec.iter().collect::<HashSet<_>>().len()))
