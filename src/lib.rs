@@ -1,6 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock};
+
+use regex::Regex;
 
 pub mod template;
+
+pub static NUM_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[+-]?\d+").unwrap());
 
 pub const DIRECTIONS: [(i32, i32); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
 

@@ -1,6 +1,6 @@
 advent_of_code::solution!(13);
 
-use regex::Regex;
+use advent_of_code::NUM_RE;
 use z3::{
     ast::{Ast, Int},
     Config, Context, Optimize, SatResult,
@@ -15,8 +15,7 @@ pub fn part_two(input: &str) -> Option<i64> {
 }
 
 fn solve(input: &str, pos_inc: i64) -> i64 {
-    let re = Regex::new(r"[+-]?\d+").unwrap();
-    let numbers: Vec<i64> = re
+    let numbers: Vec<i64> = NUM_RE
         .find_iter(input)
         .map(|m| m.as_str().parse().unwrap())
         .collect();
