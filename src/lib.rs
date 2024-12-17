@@ -84,6 +84,13 @@ pub fn indexed_chars(input: &str) -> HashMap<(i32, i32), char> {
         .collect()
 }
 
+pub fn find_char_index(chars: &HashMap<(i32, i32), char>, ch: char) -> Option<(i32, i32)> {
+    chars
+        .iter()
+        .filter_map(|(idx, v)| if v == &ch { Some(*idx) } else { None })
+        .next()
+}
+
 pub fn bounds(input: &str) -> (i32, i32) {
     let lines: Vec<_> = input.lines().collect();
     (lines.len() as i32, lines[0].len() as i32)
