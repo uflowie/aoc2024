@@ -1,49 +1,42 @@
-use std::collections::{BinaryHeap, HashMap, HashSet};
-
 use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use advent_of_code::{add, find_char_index, indexed_chars};
 
 advent_of_code::solution!(16);
 
 pub fn part_one(input: &str) -> Option<i32> {
-    let (paths, end_idx) = get_paths(input);
+    let (paths, end_idx) = get_best_paths(input);
 
-    let cost = paths
-        .into_iter()
+    paths
+        .iter()
         .filter_map(|(node, (cost, _))| {
             if node.idx == end_idx {
-                Some(cost)
+                Some(*cost)
             } else {
                 None
             }
         })
-        .next();
-
-    cost
+        .next()
 }
 
 pub fn part_two(input: &str) -> Option<usize> {
-    let (paths, end_idx) = get_paths(input);
+    let (paths, end_idx) = get_best_paths(input);
 
-    let unique_best_tiles = paths
-        .into_iter()
-        .filter_map(|(node, (_, paths))| {
-            if node.idx == end_idx {
-                Some(paths.into_iter().flatten())
-            } else {
-                None
-            }
+    let unique_tiles: HashSet<_> = paths
+        .iter()
+        .filter(|(node, _)| node.idx == end_idx)
+        .flat_map(|(_, (_, path_lists))| {
+            path_lists
+                .iter()
+                .flat_map(|path| path.iter().map(|n| n.idx))
         })
-        .flatten()
-        .map(|node| node.idx)
-        .collect::<HashSet<_>>()
-        .len();
+        .collect();
 
-    Some(unique_best_tiles)
+    Some(unique_tiles.len())
 }
 
-fn get_paths(input: &str) -> (HashMap<Node, (i32, Vec<Vec<Node>>)>, (i32, i32)) {
+fn get_best_paths(input: &str) -> (HashMap<Node, (i32, Vec<Vec<Node>>)>, (i32, i32)) {
     let tiles = indexed_chars(input);
 
     let start = Node {
@@ -59,104 +52,81 @@ fn get_paths(input: &str) -> (HashMap<Node, (i32, Vec<Vec<Node>>)>, (i32, i32)) 
     let mut queue = BinaryHeap::from([(Reverse(0), start.clone())]);
     let mut visited = HashSet::<Node>::new();
 
-    let mut paths = HashMap::new();
+    let mut paths: HashMap<Node, (i32, Vec<Vec<Node>>)> = HashMap::new();
     paths.insert(start.clone(), (0, vec![vec![]]));
 
-    while let Some((cost, node)) = queue.pop() {
-        let cost = cost.0;
-
-        if visited.contains(&node) {
+    while let Some((Reverse(cost), node)) = queue.pop() {
+        if !visited.insert(node.clone()) {
             continue;
         }
 
         let next_tile = add(node.idx, node.direction);
+
         let candidates = [
             Some((
                 cost + 1000,
                 Node {
                     direction: (-node.direction.1, node.direction.0),
-                    ..node
+                    idx: node.idx,
                 },
             )),
             Some((
                 cost + 1000,
                 Node {
                     direction: (node.direction.1, -node.direction.0),
-                    ..node
+                    idx: node.idx,
                 },
             )),
-            if let Some(tile) = tiles.get(&next_tile) {
+            tiles.get(&next_tile).and_then(|tile| {
                 if *tile == '.' || *tile == 'E' {
                     Some((
                         cost + 1,
                         Node {
+                            direction: node.direction,
                             idx: next_tile,
-                            ..node
                         },
                     ))
                 } else {
                     None
                 }
-            } else {
-                None
-            },
+            }),
         ];
 
-        // get new paths
-        let new_paths: Vec<Vec<Node>> = paths
-            .get(&node)
-            .unwrap()
-            .1
+        let current_paths = &paths[&node].1;
+        let extended_paths: Vec<Vec<Node>> = current_paths
             .iter()
-            .map(|inner_vec| {
-                let mut new_inner = inner_vec.clone();
-                new_inner.push(node.clone());
-                new_inner
+            .map(|p| {
+                let mut new_path = p.clone();
+                new_path.push(node.clone());
+                new_path
             })
             .collect();
 
-        // println!("{:?}", new_paths);
-
-        for (cost, node) in candidates.into_iter().flatten() {
-            let new_paths = new_paths.clone();
-
-            if let Some((last_cost, existing_paths)) = paths.get(&node) {
-                if cost > *last_cost {
-                    continue;
+        for (new_cost, new_node) in candidates.into_iter().flatten() {
+            match paths.get(&new_node) {
+                None => {
+                    paths.insert(new_node.clone(), (new_cost, extended_paths.clone()));
+                    queue.push((Reverse(new_cost), new_node));
                 }
-
-                if cost < *last_cost {
-                    // replace existing paths with current paths
-                    paths.insert(node.clone(), (cost, new_paths));
-                    queue.push((Reverse(cost), node));
-                } else if cost == *last_cost {
-                    // append current paths to existing paths
-                    paths.insert(
-                        node.clone(),
-                        (
-                            cost,
-                            existing_paths
-                                .iter()
-                                .cloned()
-                                .chain(new_paths.into_iter())
-                                .collect(),
-                        ),
-                    );
-                    queue.push((Reverse(cost), node));
+                Some((existing_cost, existing_paths)) => {
+                    if new_cost < *existing_cost {
+                        paths.insert(new_node.clone(), (new_cost, extended_paths.clone()));
+                        queue.push((Reverse(new_cost), new_node));
+                    } else if new_cost == *existing_cost {
+                        let mut combined = existing_paths.clone();
+                        combined.extend(extended_paths.clone());
+                        paths.insert(new_node.clone(), (new_cost, combined));
+                        queue.push((Reverse(new_cost), new_node));
+                    }
                 }
-            } else {
-                paths.insert(node.clone(), (cost, new_paths));
-                queue.push((Reverse(cost), node));
             }
         }
-
-        visited.insert(node);
     }
 
     (paths, end.idx)
 }
 
-#[derive(Eq, Hash, PartialEq, PartialOrd, Ord, Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, PartialOrd, Ord, Clone, Debug)]
 struct Node {
     direction: (i32, i32),
     idx: (i32, i32),
