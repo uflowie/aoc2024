@@ -1,158 +1,124 @@
 use advent_of_code::NUM_RE;
+use itertools::Itertools;
 
 advent_of_code::solution!(17);
 
 pub fn part_one(input: &str) -> Option<String> {
-    let mut program = Program::from(input);
+    let (register_a, instructions) = parse(input);
 
-    let result = program
-        .run()
-        .iter()
+    let outputs = get_outputs(register_a, &instructions)
+        .into_iter()
         .map(|x| x.to_string())
-        .collect::<Vec<_>>()
         .join(",");
 
-    Some(result)
+    Some(outputs)
 }
 
 pub fn part_two(input: &str) -> Option<usize> {
-    let program = Program::from(input);
+    let (_, instructions) = parse(input);
+    let len = instructions.len();
 
-    let len = program.instructions.len();
-
-    let mut shift = 3 * (len);
-    let mut starts = vec![1 << shift - 3];
+    let mut shift = 3 * len;
+    let mut starts = vec![1 << (shift - 3)];
 
     for i in (0..len).rev() {
         shift -= 3;
-        starts = find_block(&program, program.instructions[i], starts, shift, i);
+        let target_num = instructions[i];
+        let instruction_idx = i;
+
+        let mut block_starts = vec![];
+        for start in &starts {
+            for j in 0..8 {
+                let block_start = start + (1 << shift) * j;
+                let outputs = get_outputs(block_start, &instructions);
+
+                if outputs[instruction_idx] == target_num {
+                    block_starts.push(block_start);
+                }
+            }
+        }
+
+        starts = block_starts;
     }
 
     starts.into_iter().min()
 }
 
-fn find_block(
-    program: &Program,
-    target_num: usize,
-    starts: Vec<usize>,
-    shift: usize,
-    instruction_idx: usize,
-) -> Vec<usize> {
-    let mut block_starts = vec![];
+fn parse(input: &str) -> (usize, Box<[usize]>) {
+    let mut nums = NUM_RE.find_iter(input).map(|x| x.as_str().parse().unwrap());
 
-    for start in starts {
-        for i in 0..8 {
-            let block_start = start + (1 << shift) * i;
-            let mut program = Program {
-                register_a: block_start,
-                ..program.clone()
-            };
-            let outputs = program.run();
+    let register_a = nums.next().unwrap();
+    nums.next();
+    nums.next();
 
-            if outputs[instruction_idx] == target_num {
-                block_starts.push(block_start);
-            }
-        }
-    }
+    let instructions = nums.collect();
 
-    block_starts
+    (register_a, instructions)
 }
 
-#[derive(Clone)]
-struct Program {
-    register_a: usize,
-    register_b: usize,
-    register_c: usize,
-    stack_pointer: usize,
-    instructions: Vec<usize>,
-}
+fn get_outputs(mut register_a: usize, instructions: &[usize]) -> Vec<usize> {
+    let mut stack_pointer = 0;
+    let mut outputs = Vec::new();
+    let mut register_b = 0;
+    let mut register_c = 0;
 
-impl Program {
-    fn run(&mut self) -> Vec<usize> {
-        let mut outputs = Vec::new();
+    while stack_pointer + 1 < instructions.len() {
+        let op_code = instructions[stack_pointer];
+        let literal_operand = instructions[stack_pointer + 1];
 
-        loop {
-            if self.stack_pointer > self.instructions.len() - 1 {
-                break outputs;
+        let operand = match op_code {
+            0 | 6 | 7 | 2 | 5 => match literal_operand {
+                _ if literal_operand <= 3 => literal_operand,
+                4 => register_a,
+                5 => register_b,
+                _ => register_c,
+            },
+            _ => literal_operand,
+        };
+
+        match op_code {
+            0 | 6 | 7 => {
+                let numerator = register_a;
+                let denominator = 1 << operand;
+                let result = numerator / denominator;
+
+                let register = match op_code {
+                    0 => &mut register_a,
+                    6 => &mut register_b,
+                    _ => &mut register_c,
+                };
+                *register = result;
+                stack_pointer += 2;
             }
-
-            let op_code = self.instructions[self.stack_pointer];
-            let operand = self.instructions[self.stack_pointer + 1];
-
-            let output = match op_code {
-                0 | 6 | 7 => {
-                    let numerator = self.register_a;
-                    let denominator = 1 << self.combo_operand(operand);
-                    let result = numerator / denominator;
-
-                    let register = match op_code {
-                        0 => &mut self.register_a,
-                        6 => &mut self.register_b,
-                        _ => &mut self.register_c,
-                    };
-                    *register = result;
-                    self.stack_pointer += 2;
-                    None
-                }
-                1 => {
-                    self.register_b = self.register_b ^ operand;
-                    self.stack_pointer += 2;
-                    None
-                }
-                2 => {
-                    self.register_b = self.combo_operand(operand) % 8;
-                    self.stack_pointer += 2;
-                    None
-                }
-                3 => {
-                    self.stack_pointer = if self.register_a == 0 {
-                        self.stack_pointer + 2
-                    } else {
-                        operand
-                    };
-                    None
-                }
-                4 => {
-                    self.register_b = self.register_b ^ self.register_c;
-                    self.stack_pointer += 2;
-                    None
-                }
-                5 => {
-                    let out = self.combo_operand(operand) % 8;
-                    self.stack_pointer += 2;
-                    Some(out)
-                }
-                _ => panic!(),
-            };
-
-            if let Some(output) = output {
-                outputs.push(output);
+            1 => {
+                register_b = register_b ^ operand;
+                stack_pointer += 2;
             }
+            2 => {
+                register_b = operand % 8;
+                stack_pointer += 2;
+            }
+            3 => {
+                stack_pointer = if register_a == 0 {
+                    stack_pointer + 2
+                } else {
+                    operand
+                };
+            }
+            4 => {
+                register_b = register_b ^ register_c;
+                stack_pointer += 2;
+            }
+            5 => {
+                let out = operand % 8;
+                outputs.push(out);
+                stack_pointer += 2;
+            }
+            _ => panic!(),
         }
     }
 
-    fn combo_operand(&self, operand: usize) -> usize {
-        match operand {
-            _ if operand <= 3 => operand,
-            4 => self.register_a,
-            5 => self.register_b,
-            _ => self.register_c,
-        }
-    }
-}
-
-impl From<&str> for Program {
-    fn from(value: &str) -> Self {
-        let mut nums = NUM_RE.find_iter(value).map(|x| x.as_str().parse().unwrap());
-
-        Self {
-            register_a: nums.next().unwrap(),
-            register_b: nums.next().unwrap(),
-            register_c: nums.next().unwrap(),
-            stack_pointer: 0,
-            instructions: nums.collect(),
-        }
-    }
+    outputs
 }
 
 #[cfg(test)]
