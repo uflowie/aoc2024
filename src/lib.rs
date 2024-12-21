@@ -17,8 +17,21 @@ pub fn get_index_neighbors(idx: (i32, i32)) -> [(i32, i32); 4] {
     ]
 }
 
+pub fn get_in_bounds_index_neighbors(
+    idx: (i32, i32),
+    bounds: (i32, i32),
+) -> impl Iterator<Item = (i32, i32)> {
+    get_index_neighbors(idx)
+        .into_iter()
+        .filter(move |&(y, x)| y >= 0 && y < bounds.0 && x >= 0 && x < bounds.1)
+}
+
 pub fn add(left: (i32, i32), right: (i32, i32)) -> (i32, i32) {
     (left.0 + right.0, left.1 + right.1)
+}
+
+pub fn manhattan_distance(a: (i32, i32), b: (i32, i32)) -> i32 {
+    (a.0 - b.0).abs() + (a.1 - b.1).abs()
 }
 
 pub fn rows<T>(v: &Vec<Vec<T>>) -> impl Iterator<Item = impl Iterator<Item = &T>> {
