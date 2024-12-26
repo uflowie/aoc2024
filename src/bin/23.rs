@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 
@@ -54,11 +54,6 @@ fn find_cliques<'a>(graph: &'a HashMap<&'a str, Vec<&'a str>>, n: usize) -> Hash
             .filter(|&&neighbor| neighbor > node)
             .copied()
             .collect();
-
-        if n == 1 {
-            cliques.insert(vec![node]);
-            continue;
-        }
 
         if filtered_neighbors.len() < n - 1 {
             continue;
